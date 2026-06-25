@@ -14,14 +14,28 @@
     align-items: center;
     overflow: hidden;
     position: relative;
-    perspective: 1200px;
-    cursor: default;
+    perspective: 1100px;
+  }
+
+  /* ===== 上下渐变遮罩 — 卡片淡入淡出 ===== */
+  .fade-top, .fade-bot {
+    position: absolute; left: 0; right: 0;
+    height: 28vh;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .fade-top {
+    top: 0;
+    background: linear-gradient(to bottom, #0b0b1a 0%, rgba(11,11,26,0.85) 40%, transparent 100%);
+  }
+  .fade-bot {
+    bottom: 0;
+    background: linear-gradient(to top, #0b0b1a 0%, rgba(11,11,26,0.85) 40%, transparent 100%);
   }
 
   /* ===== 第1层：背景镂空大字 ===== */
   .bg-wrapper {
-    position: absolute;
-    inset: 0;
+    position: absolute; inset: 0;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -31,10 +45,10 @@
   }
   .bg-text {
     font-family: 'Georgia', 'Times New Roman', serif;
-    font-size: 16vw;
+    font-size: 15vw;
     font-weight: 900;
     color: transparent;
-    -webkit-text-stroke: 1px rgba(255,255,255,0.055);
+    -webkit-text-stroke: 1px rgba(255,255,255,0.045);
     letter-spacing: 0.06em;
     white-space: nowrap;
   }
@@ -42,16 +56,16 @@
   /* ===== 第2层：环境光晕 ===== */
   .light-orb {
     position: absolute;
-    width: 700px; height: 700px;
+    width: 600px; height: 600px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(110,140,255,0.10) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(110,140,255,0.08) 0%, transparent 70%);
     pointer-events: none;
     top: 50%; left: 50%;
-    margin: -350px 0 0 -350px;
+    margin: -300px 0 0 -300px;
     will-change: transform;
   }
 
-  /* ===== 第3层：3D 卡片组 ===== */
+  /* ===== 第3层：3D 螺旋卡片组 ===== */
   .carousel {
     width: 0; height: 0;
     transform-style: preserve-3d;
@@ -62,55 +76,53 @@
   /* ===== 卡片 ===== */
   .card {
     position: absolute;
-    width: 210px;
-    height: 280px;
-    border-radius: 18px;
+    width: 190px;
+    height: 130px;
+    border-radius: 16px;
     background-size: cover;
     background-position: center;
-    border: 1px solid rgba(255,255,255,0.07);
-    left: -105px;
-    top: -140px;
+    border: 1px solid rgba(255,255,255,0.06);
+    left: -85px;
+    top: -115px;
     will-change: transform, opacity, filter, box-shadow;
-    transition: none;
   }
 
-  /* ﹣﹣光泽层﹣﹣ */
+  /* 光泽层 */
   .card::after {
     content: '';
     position: absolute; inset: 0;
-    border-radius: 18px;
+    border-radius: 16px;
     background: linear-gradient(
       140deg,
-      rgba(255,255,255,0.10) 0%,
+      rgba(255,255,255,0.09) 0%,
       rgba(255,255,255,0.02) 35%,
       transparent 55%,
-      rgba(0,0,0,0.06) 100%
+      rgba(0,0,0,0.05) 100%
     );
     pointer-events: none;
   }
 
-  /* ﹣﹣底部标签﹣﹣ */
+  /* 标签 */
   .card-label {
     position: absolute;
-    bottom: 18px; left: 18px;
+    bottom: 14px; left: 14px; right: 14px;
     color: #fff;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.10em;
     text-transform: uppercase;
-    text-shadow: 0 1px 6px rgba(0,0,0,0.7);
-    opacity: 0.85;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.4);
+    opacity: 1;
   }
 
-  /* ﹣﹣微妙光点装饰﹣﹣ */
   .card::before {
     content: '';
     position: absolute;
-    top: 10px; right: 14px;
-    width: 6px; height: 6px;
+    top: 8px; right: 12px;
+    width: 5px; height: 5px;
     border-radius: 50%;
-    background: rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.22);
     pointer-events: none;
   }
 </style>
@@ -119,110 +131,135 @@
 
 <div class="stage" id="stage">
 
-  <!-- 第1层：视差背景镂空字 -->
+  <!-- 渐变遮罩 -->
+  <div class="fade-top"></div>
+  <div class="fade-bot"></div>
+
+  <!-- 第1层 -->
   <div class="bg-wrapper" id="bgWrapper">
-    <div class="bg-text">SHOWCASE</div>
+    <div class="bg-text">SPIRAL</div>
   </div>
 
-  <!-- 第2层：环境光晕 -->
+  <!-- 第2层 -->
   <div class="light-orb" id="lightOrb"></div>
 
-  <!-- 第3层：3D 卡片组 -->
+  <!-- 第3层 -->
   <div class="carousel" id="carousel"></div>
 
 </div>
 
 <script>
-  const stage   = document.getElementById('stage');
-  const bgWrap  = document.getElementById('bgWrapper');
-  const light   = document.getElementById('lightOrb');
+  const stage    = document.getElementById('stage');
+  const bgWrap   = document.getElementById('bgWrapper');
+  const light    = document.getElementById('lightOrb');
   const carousel = document.getElementById('carousel');
 
-  // ── 卡片数据 ──
+  // ── 螺旋参数（全部卡片在一圈 360° 内）──
+  const TOTAL       = 12;       // 卡片总数
+  const HELIX_R     = 390;      // 螺旋半径（加大避免卡片重叠）
+  const CARD_GAP    = 70;       // 卡片垂直间距 (px)
+  const DEG_PER     = 360 / TOTAL;  // 相邻卡片转角 = 30°
+
+  // ── 创建卡片 ──
   const cardData = [
-    { label: 'Fashion',    seed: 200 },
-    { label: 'Fragrance',  seed: 201 },
-    { label: 'Watches',    seed: 202 },
-    { label: 'Audio',      seed: 203 },
-    { label: 'Camera',     seed: 204 },
-    { label: 'Sneakers',   seed: 205 },
-    { label: 'Typography', seed: 206 },
+    'Fashion','Fragrance','Watches','Audio',
+    'Camera','Sneakers','Typography','Architecture',
+    'Interior','Gadget','Ceramics','Lighting',
   ];
 
-  const N = cardData.length;
-  const ARC_RADIUS = 560;     // 圆弧半径 (translateZ)
-  const FAN_SPREAD = 140;     // 扇形总角度
-
   const cardEls = [];
-
-  // ── 创建卡片 DOM ──
-  cardData.forEach((d, i) => {
-    const angle = (i / (N - 1) - 0.5) * FAN_SPREAD;   // -50° … +50°
+  for (let i = 0; i < TOTAL; i++) {
+    const angle = i * DEG_PER;          // 0°,30°,60°…330°  全部在一圈内
+    const baseY = i * CARD_GAP;                  // 沿螺旋向上排列
 
     const card = document.createElement('div');
     card.className = 'card';
-    card.style.backgroundImage = `url(https://picsum.photos/seed/${d.seed}/420/560)`;
+    card.style.backgroundImage = `url(https://picsum.photos/seed/${300 + i}/380/500)`;
 
     const label = document.createElement('span');
     label.className = 'card-label';
-    label.textContent = d.label;
+    label.textContent = cardData[i] || `Card ${i}`;
     card.appendChild(label);
 
     carousel.appendChild(card);
-    cardEls.push({ el: card, baseAngle: angle });
-  });
+    cardEls.push({ el: card, angle, baseY });
+  }
 
-  // ── 滚轮驱动 ──
-  let targetRY = 0;
-  let currentRY = 0;
+  // ── 滚轮状态 ──
+  let scroll      = 0;     // 累积滚轮量
+  let current     = 0;     // lerp 后的当前值
+  const VH        = window.innerHeight;
+
+  // current=0 → 所有卡片在屏幕下方（无图可见）
+  // current=max → 所有卡片已从上方消失
 
   stage.addEventListener('wheel', e => {
     e.preventDefault();
-    targetRY += e.deltaY * 0.35;   // 滚轮刻度 → 旋转角度
+    scroll += e.deltaY * 0.70;
+    scroll = Math.max(0, Math.min(TOTAL * CARD_GAP + VH * 1.3, scroll));
   }, { passive: false });
 
   // ── 主循环 ──
   function animate() {
-    // lerp 缓动 — 惯性跟随感
-    currentRY += (targetRY - currentRY) * 0.06;
+    // lerp 缓动
+    current += (scroll - current) * 0.07;
 
-    // ★ 卡片组旋转（仅绕 Y 轴，轨迹固定）
-    carousel.style.transform = `rotateY(${currentRY}deg)`;
+    /* ==============================================
+     *  螺旋运动：滚轮驱动两个量
+     *  ① carouselY  → 整个螺旋上升
+     *  ② rotationY  → 螺旋自转（与上升同步）
+     *
+     *  current=0  → 螺旋在下方，无卡片可见
+     *  current>0  → 螺旋上升 + 自转
+     * ============================================== */
+    const carouselY = VH * 0.65 - current;       // 从屏幕下方开始上升
+    /* rotationY 与 carouselY 精确同步：
+     *   卡片 i 到达视口中心时 carouselY = -i*CARD_GAP，
+     *   此时 rotationY = -i*DEG_PER = -angle → 卡片正好面向观众
+     *   12 张卡片刚好一圈 360°，每张都在屏幕正中达到 C 位 */
+    const rotationY = (carouselY / CARD_GAP) * DEG_PER;
 
-    // ★ 背景文字视差 — 旋转时反向偏移
-    const px = -currentRY * 3.5;
-    const py = 0;
-    bgWrap.style.transform = `translate(${px}px, ${py}px)`;
+    carousel.style.transform =
+      `rotateY(${rotationY}deg) translateY(${carouselY}px)`;
 
-    // ★ 光晕跟随旋转偏移
-    light.style.transform = `translate(${currentRY * 6}px, 0)`;
+    // ★ 背景文字视差
+    bgWrap.style.transform = `translateY(${-current * 0.12}px)`;
 
-    // ★ 每张卡片 C 位高亮
-    for (const { el, baseAngle } of cardEls) {
-      // 卡片有效面向角度 = 基础角 + 组旋转
-      const facingDeg = baseAngle + currentRY;
-      const facing = Math.cos(facingDeg * Math.PI / 180); // 1=正面, -1=背面
-      const h = (facing + 1) / 2;                          // 0…1 高亮系数
+    // ★ 光晕偏移
+    light.style.transform = `translate(0, ${-current * 0.25}px)`;
 
-      const scale  = 0.82  + h * 0.24;     // 0.82 … 1.06
-      const bright = 0.50  + h * 0.60;     // 0.50 … 1.10
-      const depth  = 3     + h * 28;       // 阴影深度
-      const spread = 12    + h * 50;       // 阴影扩散
+    // ★ 每张卡片的高亮
+    for (const { el, angle, baseY } of cardEls) {
+      // 卡片在屏幕空间中的 Y 位置（视口中心 = 0）
+      const screenY  = baseY + carouselY;
+      const dist     = Math.abs(screenY) / (VH * 0.55);   // 归一化距离
+      const vertF    = Math.max(0, 1 - dist);              // 0→1，中心=1
 
-      // 基础阴影
-      let shadow = `0 ${depth}px ${spread}px rgba(0,0,0,${0.18 + h * 0.35})`;
+      // 卡片面向角度（考虑螺旋自转）
+      const facingDeg = angle + rotationY;
+      const facing    = Math.cos(facingDeg * Math.PI / 180);
+      const faceF     = (facing + 1) / 2;
 
-      // C 位光晕（高亮系数 > 0.65 时出现）
-      if (h > 0.65) {
-        const glow = (h - 0.65) / 0.35;    // 0…1
-        shadow += `, 0 0 ${70 * glow}px rgba(130,160,255,${glow * 0.50})`;
+      // 综合高亮：仅按垂直中心，正反面一致
+      const h = vertF;
+
+      const scale  = 0.65  + h * 0.45;
+      const bright = 0.50  + h * 0.60;
+      const depth  = 2     + h * 26;
+      const spread = 8     + h * 45;
+
+      let shadow = `0 ${depth}px ${spread}px rgba(0,0,0,${0.15 + h * 0.35})`;
+      if (h > 0.6) {
+        const g = (h - 0.6) / 0.4;
+        shadow += `, 0 0 ${60 * g}px rgba(130,160,255,${g * 0.45})`;
       }
 
       el.style.transform =
-        `rotateY(${baseAngle}deg) translateZ(${ARC_RADIUS}px) scale(${scale})`;
+        `rotateY(${angle}deg) translateZ(${HELIX_R}px) translateY(${baseY}px) scale(${scale})`;
       el.style.filter   = `brightness(${bright})`;
       el.style.boxShadow = shadow;
-      el.style.zIndex    = Math.round(h * 200);
+      el.style.opacity   = Math.max(0.25, Math.min(1, vertF * 1.1));
+      el.style.zIndex    = Math.round(h * 150 + vertF * 50);
     }
 
     requestAnimationFrame(animate);
