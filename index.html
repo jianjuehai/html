@@ -1,28 +1,235 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="UTF-8">
 <style>
-  .stage { perspective: 800px; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; background: #0a0a1a; }
-  .ring { width: 300px; height: 200px; transform-style: preserve-3d; animation: spin 20s linear infinite; position: relative; }
-  .ring img { position: absolute; width: 200px; height: 150px; border-radius: 12px; object-fit: cover; box-shadow: 0 0 30px rgba(100,100,255,0.3); }
-  @keyframes spin { 100% { transform: rotateY(360deg); } }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* ===== 舞台 ===== */
+  .stage {
+    width: 100vw; height: 100vh;
+    background: #0b0b1a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    position: relative;
+    perspective: 1200px;
+    cursor: default;
+  }
+
+  /* ===== 第1层：背景镂空大字 ===== */
+  .bg-wrapper {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+    user-select: none;
+    will-change: transform;
+  }
+  .bg-text {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 16vw;
+    font-weight: 900;
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(255,255,255,0.055);
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+
+  /* ===== 第2层：环境光晕 ===== */
+  .light-orb {
+    position: absolute;
+    width: 700px; height: 700px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(110,140,255,0.10) 0%, transparent 70%);
+    pointer-events: none;
+    top: 50%; left: 50%;
+    margin: -350px 0 0 -350px;
+    will-change: transform;
+  }
+
+  /* ===== 第3层：3D 卡片组 ===== */
+  .carousel {
+    width: 0; height: 0;
+    transform-style: preserve-3d;
+    position: relative;
+    will-change: transform;
+  }
+
+  /* ===== 卡片 ===== */
+  .card {
+    position: absolute;
+    width: 210px;
+    height: 280px;
+    border-radius: 18px;
+    background-size: cover;
+    background-position: center;
+    border: 1px solid rgba(255,255,255,0.07);
+    left: -105px;
+    top: -140px;
+    will-change: transform, opacity, filter, box-shadow;
+    transition: none;
+  }
+
+  /* ﹣﹣光泽层﹣﹣ */
+  .card::after {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 18px;
+    background: linear-gradient(
+      140deg,
+      rgba(255,255,255,0.10) 0%,
+      rgba(255,255,255,0.02) 35%,
+      transparent 55%,
+      rgba(0,0,0,0.06) 100%
+    );
+    pointer-events: none;
+  }
+
+  /* ﹣﹣底部标签﹣﹣ */
+  .card-label {
+    position: absolute;
+    bottom: 18px; left: 18px;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.7);
+    opacity: 0.85;
+  }
+
+  /* ﹣﹣微妙光点装饰﹣﹣ */
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 10px; right: 14px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    pointer-events: none;
+  }
 </style>
 </head>
 <body>
-<div class="stage">
-  <div class="ring" id="ring"></div>
+
+<div class="stage" id="stage">
+
+  <!-- 第1层：视差背景镂空字 -->
+  <div class="bg-wrapper" id="bgWrapper">
+    <div class="bg-text">SHOWCASE</div>
+  </div>
+
+  <!-- 第2层：环境光晕 -->
+  <div class="light-orb" id="lightOrb"></div>
+
+  <!-- 第3层：3D 卡片组 -->
+  <div class="carousel" id="carousel"></div>
+
 </div>
+
 <script>
-  const ring = document.getElementById('ring');
-  const count = 12;
-  const radius = 400;
-  for (let i = 0; i < count; i++) {
-    const img = document.createElement('img');
-    img.src = `https://picsum.photos/seed/${i}/400/300`;
-    const angle = (i / count) * 360;
-    img.style.transform = `rotateY(${angle}deg) translateZ(${radius}px)`;
-    ring.appendChild(img);
+  const stage   = document.getElementById('stage');
+  const bgWrap  = document.getElementById('bgWrapper');
+  const light   = document.getElementById('lightOrb');
+  const carousel = document.getElementById('carousel');
+
+  // ── 卡片数据 ──
+  const cardData = [
+    { label: 'Fashion',    seed: 200 },
+    { label: 'Fragrance',  seed: 201 },
+    { label: 'Watches',    seed: 202 },
+    { label: 'Audio',      seed: 203 },
+    { label: 'Camera',     seed: 204 },
+    { label: 'Sneakers',   seed: 205 },
+    { label: 'Typography', seed: 206 },
+  ];
+
+  const N = cardData.length;
+  const ARC_RADIUS = 560;     // 圆弧半径 (translateZ)
+  const FAN_SPREAD = 140;     // 扇形总角度
+
+  const cardEls = [];
+
+  // ── 创建卡片 DOM ──
+  cardData.forEach((d, i) => {
+    const angle = (i / (N - 1) - 0.5) * FAN_SPREAD;   // -50° … +50°
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.backgroundImage = `url(https://picsum.photos/seed/${d.seed}/420/560)`;
+
+    const label = document.createElement('span');
+    label.className = 'card-label';
+    label.textContent = d.label;
+    card.appendChild(label);
+
+    carousel.appendChild(card);
+    cardEls.push({ el: card, baseAngle: angle });
+  });
+
+  // ── 滚轮驱动 ──
+  let targetRY = 0;
+  let currentRY = 0;
+
+  stage.addEventListener('wheel', e => {
+    e.preventDefault();
+    targetRY += e.deltaY * 0.35;   // 滚轮刻度 → 旋转角度
+  }, { passive: false });
+
+  // ── 主循环 ──
+  function animate() {
+    // lerp 缓动 — 惯性跟随感
+    currentRY += (targetRY - currentRY) * 0.06;
+
+    // ★ 卡片组旋转（仅绕 Y 轴，轨迹固定）
+    carousel.style.transform = `rotateY(${currentRY}deg)`;
+
+    // ★ 背景文字视差 — 旋转时反向偏移
+    const px = -currentRY * 3.5;
+    const py = 0;
+    bgWrap.style.transform = `translate(${px}px, ${py}px)`;
+
+    // ★ 光晕跟随旋转偏移
+    light.style.transform = `translate(${currentRY * 6}px, 0)`;
+
+    // ★ 每张卡片 C 位高亮
+    for (const { el, baseAngle } of cardEls) {
+      // 卡片有效面向角度 = 基础角 + 组旋转
+      const facingDeg = baseAngle + currentRY;
+      const facing = Math.cos(facingDeg * Math.PI / 180); // 1=正面, -1=背面
+      const h = (facing + 1) / 2;                          // 0…1 高亮系数
+
+      const scale  = 0.82  + h * 0.24;     // 0.82 … 1.06
+      const bright = 0.50  + h * 0.60;     // 0.50 … 1.10
+      const depth  = 3     + h * 28;       // 阴影深度
+      const spread = 12    + h * 50;       // 阴影扩散
+
+      // 基础阴影
+      let shadow = `0 ${depth}px ${spread}px rgba(0,0,0,${0.18 + h * 0.35})`;
+
+      // C 位光晕（高亮系数 > 0.65 时出现）
+      if (h > 0.65) {
+        const glow = (h - 0.65) / 0.35;    // 0…1
+        shadow += `, 0 0 ${70 * glow}px rgba(130,160,255,${glow * 0.50})`;
+      }
+
+      el.style.transform =
+        `rotateY(${baseAngle}deg) translateZ(${ARC_RADIUS}px) scale(${scale})`;
+      el.style.filter   = `brightness(${bright})`;
+      el.style.boxShadow = shadow;
+      el.style.zIndex    = Math.round(h * 200);
+    }
+
+    requestAnimationFrame(animate);
   }
+
+  requestAnimationFrame(animate);
 </script>
+
 </body>
 </html>
