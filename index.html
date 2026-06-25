@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D 照片丝带环绕</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: linear-gradient(180deg, #0a0a1a 0%, #000010 100%);
+      overflow: hidden;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    canvas { display: block; }
+    .hint {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.5);
+      font-size: 13px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="hint">🖱 拖拽旋转 &nbsp;|&nbsp; 滚轮缩放 &nbsp;|&nbsp; 悬停暂停</div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ========== 可调参数 ==========
+    const CONFIG = {
+      radius: 5,
+      count: 24,
+      speed: 0.3,
+      photoWidth: 1.2,
+      photoHeight: 0.8,
+      pillarHeight: 8,
+      pillarRadius: 0.15,
+      fogNear: 8,
+      fogFar: 25,
+    };
+
+    // ========== 场景初始化 ==========
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a1a);
+    scene.fog = new THREE.Fog(0x0a0a1a, CONFIG.fogNear, CONFIG.fogFar);
+
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 100);
+    camera.position.set(0, 3, 10);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    // ========== OrbitControls ==========
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 0, 0);
+    controls.minDistance = 4;
+    controls.maxDistance = 18;
+    controls.maxPolarAngle = Math.PI * 0.75;
+    controls.update();
+
+    // ========== 灯光 ==========
+    scene.add(new THREE.AmbientLight(0x334466, 2));
+    const dirLight = new THREE.DirectionalLight(0x8899cc, 3);
+    dirLight.position.set(5, 8, 5);
+    scene.add(dirLight);
+
+    // ========== 中心发光柱子 ==========
+    const pillarGeo = new THREE.CylinderGeometry(CONFIG.pillarRadius, CONFIG.pillarRadius, CONFIG.pillarHeight, 32);
+    const pillarMat = new THREE.MeshBasicMaterial({ color: 0x4488cc, transparent: true, opacity: 0.4 });
+    const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+    scene.add(pillar);
+
+    // 光晕外层
+    const glowGeo = new THREE.CylinderGeometry(CONFIG.pillarRadius * 2.5, CONFIG.pillarRadius * 2.5, CONFIG.pillarHeight, 32);
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.1 });
+    scene.add(new THREE.Mesh(glowGeo, glowMat));
+
+    // 柱子内部点光源
+    const pointLight = new THREE.PointLight(0x4488ff, 30, 6);
+    scene.add(pointLight);
+
+    // ========== 生成照片纹理 ==========
+    const photoMeshes = [];
+    const textureLoader = new THREE.TextureLoader();
+
+    // 先创建所有照片（用纯色占位），等纹理加载完再替换
+    function createPhotoMesh(index) {
+      const geo = new THREE.PlaneGeometry(CONFIG.photoWidth, CONFIG.photoHeight);
+      // 初始用彩色占位材质
+      const hue = index / CONFIG.count;
+      const color = new THREE.Color().setHSL(hue, 0.7, 0.5);
+      const mat = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.4,
+        metalness: 0.1,
+        side: THREE.DoubleSide,
+      });
+
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.userData = { index, baseScale: 1, targetScale: 1 };
+      mesh.scale.set(0, 0, 0); // 初始隐藏，等纹理加载
+      return mesh;
+    }
+
+    // 加载纹理并替换材质
+    function loadTextures() {
+      const group = new THREE.Group();
+
+      // 先创建所有 mesh
+      for (let i = 0; i < CONFIG.count; i++) {
+        const mesh = createPhotoMesh(i);
+        photoMeshes.push(mesh);
+        group.add(mesh);
+
+        // 异步加载纹理
+        const url = `https://picsum.photos/300/200?random=${i + 1}`;
+        textureLoader.load(
+          url,
+          (texture) => {
+            // 成功：替换材质
+            mesh.material = new THREE.MeshStandardMaterial({
+              map: texture,
+              roughness: 0.4,
+              metalness: 0.1,
+              side: THREE.DoubleSide,
+            });
+            mesh.scale.set(1, 1, 1);
+          },
+          undefined,
+          () => {
+            // 失败：保持纯色材质，直接显示
+            mesh.scale.set(1, 1, 1);
+          }
+        );
+
+        // 如果 1.5 秒还没加载完，直接显示
+        setTimeout(() => {
+          if (mesh.scale.x === 0) mesh.scale.set(1, 1, 1);
+        }, 1500);
+      }
+
+      return group;
+    }
+
+    const photoGroup = loadTextures();
+    scene.add(photoGroup);
+
+    // ========== 地面参考环（装饰） ==========
+    const ringGeo = new THREE.TorusGeometry(CONFIG.radius, 0.02, 16, 200);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x334466, transparent: true, opacity: 0.5 });
+    scene.add(new THREE.Mesh(ringGeo, ringMat));
+
+    // ========== 粒子背景 ==========
+    const particlesGeo = new THREE.BufferGeometry();
+    const particlesCount = 500;
+    const positions = new Float32Array(particlesCount * 3);
+    for (let i = 0; i < particlesCount; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 20;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 20;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 20;
+    }
+    particlesGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const particlesMat = new THREE.PointsMaterial({
+      color: 0x6688cc,
+      size: 0.02,
+      transparent: true,
+      opacity: 0.6,
+    });
+    scene.add(new THREE.Points(particlesGeo, particlesMat));
+
+    // ========== 光线投射（悬停检测） ==========
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let hoveredMesh = null;
+
+    window.addEventListener('pointermove', (e) => {
+      mouse.x = (e.clientX / innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+    });
+
+    function updateHover() {
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(photoMeshes);
+
+      // 还原上一个悬停的照片
+      if (hoveredMesh && (!intersects.length || intersects[0].object !== hoveredMesh)) {
+        hoveredMesh.userData.targetScale = 1;
+        hoveredMesh = null;
+      }
+
+      // 设置新的悬停照片
+      if (intersects.length && intersects[0].object !== hoveredMesh) {
+        hoveredMesh = intersects[0].object;
+        hoveredMesh.userData.targetScale = 1.15;
+      }
+    }
+
+    // ========== 悬停暂停自转 ==========
+    let isHovering = false;
+    renderer.domElement.addEventListener('mouseenter', () => { isHovering = true; });
+    renderer.domElement.addEventListener('mouseleave', () => {
+      isHovering = false;
+      if (hoveredMesh) {
+        hoveredMesh.userData.targetScale = 1;
+        hoveredMesh = null;
+      }
+    });
+
+    // ========== 响应式 ==========
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    // ========== 动画循环 ==========
+    const clock = new THREE.Clock();
+    let angle = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(clock.getDelta(), 0.1);
+
+      // 自动旋转
+      if (!isHovering) {
+        angle += CONFIG.speed * dt;
+      }
+
+      // 更新照片位置和方向（丝带效果：照片沿切向排列，面朝外）
+      const angleStep = (Math.PI * 2) / CONFIG.count;
+      photoMeshes.forEach((mesh, i) => {
+        const a = angle + angleStep * i;
+        mesh.position.x = CONFIG.radius * Math.cos(a);
+        mesh.position.z = CONFIG.radius * Math.sin(a);
+        mesh.position.y = Math.sin(a * 3) * 0.4; // 轻微上下起伏，像丝带
+        // 面朝径向朝外（沿切向排列），形成丝带效果
+        mesh.lookAt(
+          mesh.position.x + Math.cos(a),
+          mesh.position.y,
+          mesh.position.z + Math.sin(a)
+        );
+
+        // 平滑缩放
+        mesh.scale.lerp(
+          new THREE.Vector3(1, 1, 1).multiplyScalar(mesh.userData.targetScale),
+          0.1
+        );
+      });
+
+      updateHover();
+      controls.update();
+
+      // 粒子缓慢旋转
+      scene.children.find(c => c.isPoints)?.rotateY?.(dt * 0.05);
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+    console.log('✅ 3D 照片丝带已就绪 — 共 ' + CONFIG.count + ' 张照片');
+  </script>
+</body>
+</html>
